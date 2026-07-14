@@ -1,0 +1,6 @@
+{
+  "name": "Capitão Embalagens",
+  "description": "Aplicativo de e-commerce e painel administrativo completo para a Capitão Embalagens.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

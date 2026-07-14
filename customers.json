@@ -1,0 +1,23 @@
+[
+  {
+    "id": "cust-1",
+    "name": "Gabriela Connor",
+    "email": "gabiconnor18@gmail.com",
+    "password": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    "phone": "(11) 98122-4321",
+    "cashback": 12.5,
+    "loyalty_points": 120,
+    "addresses": [
+      {
+        "id": "addr-1",
+        "street": "Av. Brigadeiro Luís Antônio, 1200",
+        "number": "Apto 45",
+        "city": "São Paulo",
+        "state": "SP",
+        "zipCode": "01318-001",
+        "isDefault": true
+      }
+    ],
+    "photo": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"
+  }
+]

@@ -269,6 +269,69 @@ export async function clientUpdateOrderStatus(id: string, status: string, histor
 }
 
 /**
+ * Update order with PIX receipt
+ */
+export async function clientUploadPixReceipt(id: string, pixReceipt: string, history: any[]): Promise<any> {
+  try {
+    return await safeFetchJson(`/api/orders/${id}/pix-receipt`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pixReceipt })
+    });
+  } catch (error) {
+    console.warn("clientUploadPixReceipt: Falha via API, tentando Supabase...", error);
+  }
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from("orders").update({
+        pix_receipt: pixReceipt,
+        pix_confirmed: false,
+        status_history: history
+      }).eq("id", id).select();
+      if (error) throw error;
+      if (data && data[0]) return mapOrderFromDb(data[0]);
+    } catch (sbError) {
+      console.error("clientUploadPixReceipt Supabase Error:", sbError);
+    }
+  }
+
+  // Fallback locally
+  return { id, pixReceipt, pixConfirmed: false, statusHistory: history };
+}
+
+/**
+ * Confirm PIX payment
+ */
+export async function clientConfirmPixPayment(id: string, history: any[]): Promise<any> {
+  try {
+    return await safeFetchJson(`/api/orders/${id}/confirm-pix`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (error) {
+    console.warn("clientConfirmPixPayment: Falha via API, tentando Supabase...", error);
+  }
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from("orders").update({
+        pix_confirmed: true,
+        status: "Preparando",
+        status_history: history
+      }).eq("id", id).select();
+      if (error) throw error;
+      if (data && data[0]) return mapOrderFromDb(data[0]);
+    } catch (sbError) {
+      console.error("clientConfirmPixPayment Supabase Error:", sbError);
+    }
+  }
+
+  // Fallback locally
+  return { id, pixConfirmed: true, status: "Preparando", statusHistory: history };
+}
+
+/**
  * Register a customer
  */
 export async function clientRegisterCustomer(name: string, email: string, secret: string, phone: string): Promise<User> {

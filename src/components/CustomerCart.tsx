@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ShoppingCart, Trash2, ArrowLeft, Plus, Minus, Tag, Truck, CreditCard, 
-  ShieldCheck, QrCode, FileText, CheckCircle2, Ticket, Clock, Copy, Check, X 
+  ShieldCheck, QrCode, FileText, CheckCircle2, Ticket, Clock, Copy, Check, X, Upload
 } from 'lucide-react';
 import { Coupon } from '../types';
 
@@ -23,7 +23,8 @@ export const CustomerCart: React.FC<CustomerCartProps> = ({
     coupons, 
     user, 
     placeOrder, 
-    clearCart 
+    clearCart,
+    uploadPixReceipt
   } = useApp();
 
   // Navigation state inside cart: 'cart' | 'checkout' | 'success'
@@ -54,6 +55,56 @@ export const CustomerCart: React.FC<CustomerCartProps> = ({
   const [pixTimer, setPixTimer] = useState(600); // 10 mins in seconds
   const [pixStatus, setPixStatus] = useState<'pending' | 'success'>('pending');
   const [copiedPix, setCopiedPix] = useState(false);
+
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptBase64, setReceiptBase64] = useState<string>("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setReceiptFile(file);
+      
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setReceiptBase64(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      setReceiptFile(file);
+      
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setReceiptBase64(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUploadReceipt = async () => {
+    if (!placedOrder || !receiptBase64) return;
+    setIsUploading(true);
+    try {
+      await uploadPixReceipt(placedOrder.id, receiptBase64);
+      setPixStatus('success');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   // Countdown timer effect for PIX payment modal
   useEffect(() => {
@@ -789,12 +840,12 @@ export const CustomerCart: React.FC<CustomerCartProps> = ({
                           <input
                             type="text"
                             readOnly
-                            value="00020126580014br.gov.bcb.pix0136capi-8839-49fa-a387-capi-key520400005303986540510.005802BR5917CapitaoEmbalagens6009SaoPaulo62070503***6304CAPI"
+                            value={`00020126580014br.gov.bcb.pix0136capi-8839-49fa-a387-capi-key52040000530398654${placedOrder.total.toFixed(2).length.toString().padStart(2, '0')}${placedOrder.total.toFixed(2)}5802BR5917CapitaoEmbalagens6009SaoPaulo62070503***6304CAPI`}
                             className="flex-1 bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-800 px-3 py-2.5 rounded-xl text-[9px] font-mono outline-none select-all text-gray-600 dark:text-gray-300"
                           />
                           <button
                             onClick={() => {
-                              navigator.clipboard.writeText("00020126580014br.gov.bcb.pix0136capi-8839-49fa-a387-capi-key520400005303986540510.005802BR5917CapitaoEmbalagens6009SaoPaulo62070503***6304CAPI");
+                              navigator.clipboard.writeText(`00020126580014br.gov.bcb.pix0136capi-8839-49fa-a387-capi-key52040000530398654${placedOrder.total.toFixed(2).length.toString().padStart(2, '0')}${placedOrder.total.toFixed(2)}5802BR5917CapitaoEmbalagens6009SaoPaulo62070503***6304CAPI`);
                               setCopiedPix(true);
                               setTimeout(() => setCopiedPix(false), 3000);
                             }}
@@ -806,14 +857,71 @@ export const CustomerCart: React.FC<CustomerCartProps> = ({
                         </div>
                       </div>
 
-                      {/* Manual Confirmation simulation */}
+                      {/* Bank Details section */}
+                      <div className="bg-slate-50 dark:bg-gray-850 p-3 rounded-2xl border border-gray-150 dark:border-gray-800 text-left text-[11px] space-y-2">
+                        <p className="font-extrabold text-gray-700 dark:text-gray-300 uppercase tracking-wider text-[9px]">Dados da Conta de Destino</p>
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-gray-600 dark:text-gray-400">
+                          <div><strong>Favorecido:</strong> Capitão Embalagens Ltda.</div>
+                          <div><strong>Banco:</strong> Banco do Brasil (001)</div>
+                          <div><strong>Agência:</strong> 3420-7</div>
+                          <div><strong>Conta Corrente:</strong> 88394-5</div>
+                          <div className="col-span-2 mt-1"><strong>CNPJ (Chave Pix):</strong> 48.839.492/0001-83</div>
+                        </div>
+                      </div>
+
+                      {/* Receipt Upload section */}
+                      <div className="space-y-2 text-left">
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">
+                          Anexe o comprovante bancário do PIX para análise:
+                        </p>
+                        <div 
+                          onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                          onDragLeave={() => setIsDragOver(false)}
+                          onDrop={handleDrop}
+                          className={`border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition-all ${
+                            receiptFile 
+                              ? 'border-emerald-400 bg-emerald-50/20 dark:bg-emerald-950/10' 
+                              : isDragOver 
+                                ? 'border-blue-400 bg-blue-50/20 dark:bg-blue-950/10' 
+                                : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
+                          }`}
+                        >
+                          <input 
+                            type="file" 
+                            accept="image/*,application/pdf" 
+                            onChange={handleFileChange} 
+                            className="hidden" 
+                            id="receipt-upload" 
+                          />
+                          <label htmlFor="receipt-upload" className="cursor-pointer space-y-2 block">
+                            {receiptFile ? (
+                              <div className="space-y-1">
+                                <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+                                <p className="text-xs font-bold text-gray-800 dark:text-white truncate">{receiptFile.name}</p>
+                                <p className="text-[9px] text-gray-400">{(receiptFile.size / 1024).toFixed(1)} KB • Pronto para enviar</p>
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                <Upload className="w-8 h-8 text-gray-400 mx-auto" />
+                                <p className="text-xs font-bold text-gray-600 dark:text-gray-300">Arraste o comprovante aqui ou clique para selecionar</p>
+                                <p className="text-[9px] text-gray-400">PNG, JPG ou PDF</p>
+                              </div>
+                            )}
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Confirm Upload and complete button */}
                       <button
-                        onClick={() => {
-                          setPixStatus('success');
-                        }}
-                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-2.5 rounded-xl text-xs cursor-pointer shadow-md transition-all active:scale-95"
+                        onClick={handleUploadReceipt}
+                        disabled={!receiptBase64 || isUploading}
+                        className={`w-full text-white font-extrabold py-2.5 rounded-xl text-xs cursor-pointer shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 ${
+                          receiptBase64 && !isUploading
+                            ? 'bg-emerald-600 hover:bg-emerald-500' 
+                            : 'bg-gray-300 dark:bg-gray-800 cursor-not-allowed opacity-50 text-gray-500'
+                        }`}
                       >
-                        Confirmar Pagamento Realizado
+                        {isUploading ? "Enviando Comprovante..." : "Enviar Comprovante & Finalizar"}
                       </button>
                     </>
                   ) : (
@@ -824,16 +932,20 @@ export const CustomerCart: React.FC<CustomerCartProps> = ({
                     >
                       <CheckCircle2 className="w-12 h-12 text-emerald-600 dark:text-emerald-400 mx-auto animate-bounce" />
                       <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-400">
-                        PIX Confirmado! 🎉
+                        Comprovante Enviado! 🎉
                       </h4>
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-normal">
-                        Nosso sistema detectou a transferência. Seu pedido já foi enviado para a fila de separação da Capitão Embalagens!
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed text-left">
+                        O comprovante foi registrado em nosso sistema. Nosso gerente verificará a transferência PIX recebida em nossa conta bancária para confirmar o pedido.
                       </p>
+                      <div className="p-2.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 text-left text-[10px] text-amber-800 dark:text-amber-300 rounded-xl space-y-1">
+                        <strong className="block uppercase tracking-wider text-[9px]">💡 Simulação de Pagamento</strong>
+                        Você pode simular a conferência bancária do gerente! Ative o <strong>Modo Gerente</strong> no cabeçalho e acesse o painel administrativo para visualizar e aprovar este pedido!
+                      </div>
                       <button
                         onClick={() => setShowPaymentModal(false)}
-                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-xl text-xs cursor-pointer transition-all mt-2"
+                        className="w-full bg-[#1565C0] hover:bg-[#1565C0]/90 text-white font-bold py-2 rounded-xl text-xs cursor-pointer transition-all mt-2"
                       >
-                        Acessar Painel do Pedido
+                        Visualizar Meus Pedidos
                       </button>
                     </motion.div>
                   )}

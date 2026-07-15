@@ -183,6 +183,63 @@ app.put("/api/orders/:id/status", async (req, res) => {
   }
 });
 
+app.put("/api/orders/:id/pix-receipt", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { pixReceipt } = req.body;
+    if (!pixReceipt) {
+      return res.status(400).json({ error: "O comprovante é obrigatório." });
+    }
+
+    const orders = await db.getOrders();
+    const existingOrder = orders.find((o) => o.id === id);
+    if (!existingOrder) {
+      return res.status(404).json({ error: "Pedido não encontrado." });
+    }
+
+    const dateStr = new Date().toISOString().replace("T", " ").substring(0, 16);
+    const updatedHistory = [
+      ...existingOrder.statusHistory,
+      {
+        status: existingOrder.status,
+        date: dateStr,
+        description: "Comprovante de pagamento PIX recebido. Aguardando conferência administrativa."
+      }
+    ];
+
+    const updated = await db.updateOrderPix(id, pixReceipt, false, updatedHistory);
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Erro ao enviar comprovante PIX." });
+  }
+});
+
+app.put("/api/orders/:id/confirm-pix", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const orders = await db.getOrders();
+    const existingOrder = orders.find((o) => o.id === id);
+    if (!existingOrder) {
+      return res.status(404).json({ error: "Pedido não encontrado." });
+    }
+
+    const dateStr = new Date().toISOString().replace("T", " ").substring(0, 16);
+    const updatedHistory = [
+      ...existingOrder.statusHistory,
+      {
+        status: "Preparando",
+        date: dateStr,
+        description: "Pagamento PIX confirmado eletronicamente! Iniciando separação dos itens."
+      }
+    ];
+
+    const updated = await db.updateOrderPix(id, existingOrder.pixReceipt || "comprovante_presumido.png", true, updatedHistory);
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Erro ao confirmar pagamento PIX." });
+  }
+});
+
 // 3. GEMINI SUPPORT CHAT ENDPOINT
 app.post("/api/chat", async (req, res) => {
   try {

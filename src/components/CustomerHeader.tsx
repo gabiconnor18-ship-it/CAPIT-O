@@ -25,7 +25,7 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
   onOpenSchoolList,
   onOpenScanner
 }) => {
-  const { cart, activeTheme, toggleTheme, notifications, markNotificationsAsRead } = useApp();
+  const { cart, activeTheme, toggleTheme, notifications, markNotificationsAsRead, isAdmin, toggleAdmin } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showNotifDrawer, setShowNotifDrawer] = useState(false);
@@ -244,6 +244,17 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
               className="hover:text-white transition-colors cursor-pointer flex items-center gap-1"
             >
               <span>💬</span> Atendimento Online
+            </button>
+            <button 
+              onClick={toggleAdmin} 
+              className={`transition-all cursor-pointer flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
+                isAdmin 
+                  ? 'bg-amber-400 hover:bg-amber-300 text-slate-900 border border-amber-300 shadow-md shadow-amber-400/20' 
+                  : 'bg-white/10 hover:bg-white/15 text-blue-100 hover:text-white border border-white/5'
+              }`}
+              id="capi-toggle-admin-header"
+            >
+              <span>⚙️</span> {isAdmin ? "Painel Gerente Ativo" : "Ativar Modo Gerente"}
             </button>
           </div>
           <div className="text-[10px] sm:text-[11px] text-blue-200 font-medium">

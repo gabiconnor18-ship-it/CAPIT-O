@@ -22,6 +22,8 @@ import {
   clientGetOrders,
   clientAddOrder,
   clientUpdateOrderStatus,
+  clientUploadPixReceipt,
+  clientConfirmPixPayment,
   clientRegisterCustomer,
   clientLoginCustomer,
   clientUpdateCustomerProfile,
@@ -57,6 +59,8 @@ interface AppContextType {
   // Order Actions
   placeOrder: (paymentMethod: string, deliveryOption: string, addressId: string, appliedCoupon: string | null) => Order;
   updateOrderStatus: (orderId: string, status: 'Pendente' | 'Preparando' | 'Enviado' | 'Entregue') => void;
+  uploadPixReceipt: (orderId: string, base64Receipt: string) => Promise<void>;
+  confirmPixPayment: (orderId: string) => Promise<void>;
   
   // Product Reviews
   addReview: (productId: string, rating: number, comment: string) => void;
@@ -213,7 +217,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return (local as 'light' | 'dark') || 'light';
   });
   
-  const isAdmin = false;
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    return localStorage.getItem('capi_is_admin') === 'true';
+  });
   
   const [isLogged, setIsLogged] = useState<boolean>(() => {
     const raw = localStorage.getItem('capi_is_logged');
@@ -617,7 +623,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleAdmin = () => {
-    // Administrativo desabilitado
+    setIsAdmin(prev => {
+      const newVal = !prev;
+      localStorage.setItem('capi_is_admin', newVal ? 'true' : 'false');
+      addNotification("Acesso Alterado 🔄", newVal ? "Você entrou no Painel Administrativo Capitão!" : "Você retornou para a Área do Cliente.");
+      return newVal;
+    });
+  };
+
+  const uploadPixReceipt = async (orderId: string, base64Receipt: string): Promise<void> => {
+    try {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) throw new Error("Pedido não encontrado.");
+
+      const dateStr = new Date().toISOString().replace("T", " ").substring(0, 16);
+      const updatedHistory = [
+        ...order.statusHistory,
+        {
+          status: order.status,
+          date: dateStr,
+          description: "Comprovante de pagamento PIX recebido. Aguardando conferência administrativa."
+        }
+      ];
+
+      await clientUploadPixReceipt(orderId, base64Receipt, updatedHistory);
+      setOrders(prev => prev.map(ord => ord.id === orderId ? { ...ord, pixReceipt: base64Receipt, pixConfirmed: false, statusHistory: updatedHistory } : ord));
+      addNotification("Comprovante Enviado! 📄", "Seu comprovante PIX foi enviado com sucesso e está em análise!");
+    } catch (err: any) {
+      console.error("Erro ao fazer upload do comprovante PIX:", err);
+      addNotification("Falha no Envio ❌", err.message || "Não foi possível anexar o comprovante.");
+    }
+  };
+
+  const confirmPixPayment = async (orderId: string): Promise<void> => {
+    try {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) throw new Error("Pedido não encontrado.");
+
+      const dateStr = new Date().toISOString().replace("T", " ").substring(0, 16);
+      const updatedHistory = [
+        ...order.statusHistory,
+        {
+          status: "Preparando",
+          date: dateStr,
+          description: "Pagamento PIX confirmado eletronicamente! Iniciando separação dos itens."
+        }
+      ];
+
+      await clientConfirmPixPayment(orderId, updatedHistory);
+      setOrders(prev => prev.map(ord => ord.id === orderId ? { ...ord, status: "Preparando", pixConfirmed: true, statusHistory: updatedHistory } : ord));
+      addNotification("Pagamento Confirmado! ✅", `O pedido ${orderId} foi confirmado e enviado para separação!`);
+    } catch (err: any) {
+      console.error("Erro ao confirmar pagamento PIX:", err);
+      addNotification("Falha na Confirmação ❌", err.message || "Não foi possível confirmar o PIX.");
+    }
   };
 
   // Admin Actions
@@ -849,6 +908,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toggleFavorite,
       placeOrder,
       updateOrderStatus,
+      uploadPixReceipt,
+      confirmPixPayment,
       addReview,
       addNotification,
       markNotificationsAsRead,

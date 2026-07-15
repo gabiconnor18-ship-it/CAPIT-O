@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Order } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, MapPin, History, Gift, Award, Settings, CheckCircle2, Truck, ChevronRight, X, Clock, HelpCircle, Save } from 'lucide-react';
+import { User, MapPin, History, Gift, Award, Settings, CheckCircle2, Truck, ChevronRight, X, Clock, HelpCircle, Save, FileText } from 'lucide-react';
 
 export const CustomerProfile: React.FC = () => {
-  const { user, orders, updateUserProfile, logoutCustomer, whatsappNumber, whatsappMessage } = useApp();
+  const { user, orders, updateUserProfile, logoutCustomer, whatsappNumber, whatsappMessage, isAdmin, confirmPixPayment, updateOrderStatus } = useApp();
   
-  // Tab control: 'history' | 'loyalty' | 'settings'
-  const [activeTab, setActiveTab] = useState<'history' | 'loyalty' | 'settings'>('history');
+  // Tab control: 'history' | 'loyalty' | 'settings' | 'admin'
+  const [activeTab, setActiveTab] = useState<'history' | 'loyalty' | 'settings' | 'admin'>('history');
   
   // Tracking modal target
   const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
@@ -78,11 +78,12 @@ export const CustomerProfile: React.FC = () => {
       </div>
 
       {/* Profile navigation tabs */}
-      <div className="flex border-b border-slate-100 dark:border-gray-800 pb-1 gap-1">
+      <div className="flex flex-wrap border-b border-slate-100 dark:border-gray-800 pb-1 gap-1">
         {[
           { id: 'history', label: 'Histórico de Pedidos', icon: <History className="w-4 h-4" /> },
           { id: 'loyalty', label: 'Clube de Vantagens', icon: <Award className="w-4 h-4" /> },
-          { id: 'settings', label: 'Editar Perfil', icon: <Settings className="w-4 h-4" /> }
+          { id: 'settings', label: 'Editar Perfil', icon: <Settings className="w-4 h-4" /> },
+          ...(isAdmin ? [{ id: 'admin', label: 'Painel Gerencial', icon: <Settings className="w-4 h-4 text-amber-500 animate-spin-slow" /> }] : [])
         ].map(tab => (
           <button
             key={tab.id}
@@ -298,6 +299,187 @@ export const CustomerProfile: React.FC = () => {
             >
               Suporte WhatsApp 💬
             </a>
+          </div>
+        )}
+
+        {/* TAB 4: ADMIN / GERENCIAL PANEL */}
+        {activeTab === 'admin' && (
+          <div className="space-y-4">
+            <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-amber-700 dark:text-amber-400 uppercase tracking-tight flex items-center gap-1.5">
+                  🛡️ Painel de Controle de Vendas & Recebíveis
+                </h3>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                  Gerencie pedidos, verifique comprovantes PIX e confirme o faturamento em tempo real.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <div className="bg-white dark:bg-gray-800 p-2.5 rounded-xl border border-gray-150 dark:border-gray-700 text-center shadow-2xs">
+                  <p className="text-[8px] uppercase font-bold text-gray-400">Pendentes</p>
+                  <p className="text-base font-black text-amber-500">{orders.filter(o => o.status === 'Pendente').length}</p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 p-2.5 rounded-xl border border-gray-150 dark:border-gray-700 text-center shadow-2xs">
+                  <p className="text-[8px] uppercase font-bold text-gray-400">Faturando PIX</p>
+                  <p className="text-base font-black text-blue-500">{orders.filter(o => o.paymentMethod === 'PIX' && !o.pixConfirmed).length}</p>
+                </div>
+              </div>
+            </div>
+
+            {orders.length === 0 ? (
+              <div className="text-center py-10 bg-white dark:bg-gray-800 rounded-3xl border border-gray-150">
+                <span className="text-2xl">📦</span>
+                <p className="text-xs text-gray-400 mt-2">Nenhum pedido cadastrado no servidor.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {orders.slice().reverse().map(order => {
+                  const hasReceipt = !!order.pixReceipt;
+                  const isPixPending = order.paymentMethod === 'PIX' && !order.pixConfirmed;
+                  
+                  let statusColor = "bg-blue-100 text-blue-800 border-blue-200";
+                  if (order.status === 'Preparando') statusColor = "bg-amber-100 text-amber-800 border-amber-200";
+                  if (order.status === 'Enviado') statusColor = "bg-purple-100 text-purple-800 border-purple-200";
+                  if (order.status === 'Entregue') statusColor = "bg-emerald-100 text-emerald-800 border-emerald-200";
+
+                  return (
+                    <div 
+                      key={order.id} 
+                      className={`bg-white dark:bg-gray-800 p-4 rounded-3xl border shadow-xs space-y-3 transition-all ${
+                        isPixPending && hasReceipt 
+                          ? 'border-amber-400 ring-2 ring-amber-400/20' 
+                          : 'border-slate-100 dark:border-gray-700'
+                      }`}
+                    >
+                      {/* Top Row: Order metadata */}
+                      <div className="flex flex-wrap justify-between items-center gap-2 border-b border-gray-100 dark:border-gray-700 pb-2.5 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-gray-900 dark:text-white">{order.id}</span>
+                          <span className="text-gray-300">|</span>
+                          <span className="text-gray-500">{order.date}</span>
+                          {order.paymentMethod === 'PIX' && (
+                            <span className="bg-[#1565C0] text-white text-[9px] font-black px-1.5 py-0.2 rounded uppercase">
+                              PIX
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`px-2 py-0.2 rounded-md font-bold text-[9px] uppercase border ${statusColor}`}>
+                            {order.status}
+                          </span>
+                          {order.paymentMethod === 'PIX' && (
+                            <span className={`px-2 py-0.2 rounded-md font-bold text-[9px] uppercase border ${
+                              order.pixConfirmed 
+                                ? 'bg-emerald-100 text-emerald-800 border-emerald-200' 
+                                : 'bg-red-100 text-red-800 border-red-200'
+                            }`}>
+                              {order.pixConfirmed ? "✓ PIX Confirmado" : "⏳ PIX Pendente"}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Purchased items */}
+                      <div className="space-y-1 py-1 text-xs text-gray-700 dark:text-gray-300">
+                        {order.items.map((item, index) => (
+                          <div key={index} className="flex justify-between font-medium">
+                            <span>{item.quantity}x {item.product.name}</span>
+                            <span className="font-mono text-gray-400">R$ {((item.product.promoPrice || item.product.price) * item.quantity).toFixed(2)}</span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between border-t border-gray-100 dark:border-gray-700 pt-1.5 font-bold text-gray-900 dark:text-white mt-1">
+                          <span>Valor Total do Pedido:</span>
+                          <span className="text-sm text-[#1565C0] dark:text-blue-400">R$ {order.total.toFixed(2)}</span>
+                        </div>
+                      </div>
+
+                      {/* Delivery Address */}
+                      <div className="bg-slate-50 dark:bg-gray-850 p-2.5 rounded-xl text-[11px] text-gray-600 dark:text-gray-400 space-y-1">
+                        <strong className="text-gray-800 dark:text-gray-200 uppercase tracking-wider text-[9px] block">Endereço do Cliente</strong>
+                        <p>{order.address.street}, Nº {order.address.number} - {order.address.city}/{order.address.state}</p>
+                      </div>
+
+                      {/* PIX receipt verification area */}
+                      {order.paymentMethod === 'PIX' && (
+                        <div className="border-t border-gray-100 dark:border-gray-700 pt-3 space-y-3 text-xs">
+                          {hasReceipt ? (
+                            <div className="space-y-2.5 bg-amber-500/5 p-3 rounded-2xl border border-amber-300/40 text-left">
+                              <div className="flex items-center gap-2">
+                                <FileText className="w-5 h-5 text-amber-500" />
+                                <div>
+                                  <h4 className="font-bold text-gray-800 dark:text-gray-200">Comprovante de Transferência Anexado</h4>
+                                  <p className="text-[10px] text-gray-400">Análise manual requerida para liquidação</p>
+                                </div>
+                              </div>
+                              
+                              {/* Document simulation / Actual Base64 rendering */}
+                              <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-900 p-3.5 space-y-2 text-[10px] text-gray-550 max-w-sm">
+                                <div className="flex justify-between items-center border-b border-gray-100 pb-1 font-bold">
+                                  <span>BANCO LIQUIDANTE S.A.</span>
+                                  <span className="text-emerald-600">RECEBIDO</span>
+                                </div>
+                                <div className="space-y-1 font-mono">
+                                  <div>ID Transação: <span className="font-bold text-gray-800 dark:text-white">E{order.id}93820983</span></div>
+                                  <div>Destinatário: <span className="font-bold text-gray-800 dark:text-white">Capitão Embalagens Ltda</span></div>
+                                  <div>Valor Recebido: <span className="font-bold text-emerald-600">R$ {order.total.toFixed(2)}</span></div>
+                                  <div>Autenticação: <span className="text-gray-400">7A83B47CE91A837</span></div>
+                                </div>
+                                {order.pixReceipt && order.pixReceipt.startsWith("data:image/") && (
+                                  <div className="border border-gray-100 dark:border-gray-800 rounded-lg overflow-hidden mt-2">
+                                    <img src={order.pixReceipt} alt="Comprovante" className="w-full max-h-36 object-contain" />
+                                  </div>
+                                )}
+                              </div>
+
+                              {!order.pixConfirmed ? (
+                                <button
+                                  onClick={() => confirmPixPayment(order.id)}
+                                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-4 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-98 transition-all"
+                                >
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  Confirmar Crédito em Conta & Liberar Pedido
+                                </button>
+                              ) : (
+                                <div className="text-emerald-600 dark:text-emerald-400 font-extrabold flex items-center gap-1.5 text-xs">
+                                  <CheckCircle2 className="w-4 h-4" /> Pagamento Confirmado em Conta Bancária!
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="bg-gray-50 dark:bg-gray-850 p-3 rounded-2xl text-[10px] text-gray-400 flex items-center gap-2">
+                              <Clock className="w-4 h-4 text-gray-300" />
+                              <span>O cliente ainda não enviou o comprovante bancário deste pagamento PIX.</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* General status change action dropdown for the manager */}
+                      {(!isPixPending || order.pixConfirmed) && (
+                        <div className="border-t border-gray-100 dark:border-gray-700 pt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <span className="text-gray-400 font-medium">Alterar Status do Pedido:</span>
+                          <div className="flex gap-1.5">
+                            {(['Pendente', 'Preparando', 'Enviado', 'Entregue'] as const).map(st => (
+                              <button
+                                key={st}
+                                onClick={() => updateOrderStatus(order.id, st)}
+                                className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-colors ${
+                                  order.status === st 
+                                    ? 'bg-[#1565C0] text-white shadow-xs' 
+                                    : 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-750 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300'
+                                }`}
+                              >
+                                {st}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -44,6 +44,8 @@ export interface Order {
   };
   trackingCode: string;
   statusHistory: { status: string; date: string; description: string }[];
+  pixReceipt?: string;
+  pixConfirmed?: boolean;
 }
 
 export interface Coupon {

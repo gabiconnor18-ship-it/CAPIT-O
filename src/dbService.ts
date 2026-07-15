@@ -83,7 +83,9 @@ export function mapOrderToDb(o: any): any {
     delivery_option: o.deliveryOption || null,
     address: o.address || {},
     tracking_code: o.trackingCode || null,
-    status_history: o.statusHistory || []
+    status_history: o.statusHistory || [],
+    pix_receipt: o.pixReceipt || null,
+    pix_confirmed: o.pixConfirmed || false
   };
 }
 
@@ -98,7 +100,9 @@ export function mapOrderFromDb(o: any): Order {
     deliveryOption: o.delivery_option || "",
     address: o.address || {},
     trackingCode: o.tracking_code || "",
-    statusHistory: o.status_history || []
+    statusHistory: o.status_history || [],
+    pixReceipt: o.pix_receipt || undefined,
+    pixConfirmed: o.pix_confirmed || false
   };
 }
 
@@ -425,6 +429,38 @@ export async function updateOrderStatus(id: string, status: string, statusHistor
   if (index !== -1) {
     orders[index].status = status as any;
     orders[index].statusHistory = statusHistory;
+    writeLocalOrders(orders);
+    return orders[index];
+  }
+  throw new Error("Pedido não encontrado.");
+}
+
+export async function updateOrderPix(id: string, pixReceipt: string, pixConfirmed: boolean, statusHistory: any[]): Promise<Order> {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from("orders").update({
+        pix_receipt: pixReceipt,
+        pix_confirmed: pixConfirmed,
+        status_history: statusHistory,
+        status: pixConfirmed ? "Preparando" : "Pendente"
+      }).eq("id", id).select();
+      if (error) throw error;
+      if (data && data[0]) {
+        return mapOrderFromDb(data[0]);
+      }
+    } catch (err) {
+      console.error("Supabase Error (updateOrderPix):", err);
+    }
+  }
+  const orders = readLocalOrders();
+  const index = orders.findIndex(o => o.id === id);
+  if (index !== -1) {
+    orders[index].pixReceipt = pixReceipt;
+    orders[index].pixConfirmed = pixConfirmed;
+    orders[index].statusHistory = statusHistory;
+    if (pixConfirmed) {
+      orders[index].status = "Preparando";
+    }
     writeLocalOrders(orders);
     return orders[index];
   }

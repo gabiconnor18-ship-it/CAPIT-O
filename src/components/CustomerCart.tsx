@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShoppingCart, Trash2, ArrowLeft, Plus, Minus, Tag, Truck, CreditCard, ShieldCheck, QrCode, FileText, CheckCircle2, Ticket } from 'lucide-react';
+import { 
+  ShoppingCart, Trash2, ArrowLeft, Plus, Minus, Tag, Truck, CreditCard, 
+  ShieldCheck, QrCode, FileText, CheckCircle2, Ticket, Clock, Copy, Check, X 
+} from 'lucide-react';
 import { Coupon } from '../types';
 
 interface CustomerCartProps {
@@ -45,6 +48,35 @@ export const CustomerCart: React.FC<CustomerCartProps> = ({
 
   // Placed order success tracker
   const [placedOrder, setPlacedOrder] = useState<any>(null);
+
+  // Payment Modal states
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [pixTimer, setPixTimer] = useState(600); // 10 mins in seconds
+  const [pixStatus, setPixStatus] = useState<'pending' | 'success'>('pending');
+  const [copiedPix, setCopiedPix] = useState(false);
+
+  // Countdown timer effect for PIX payment modal
+  useEffect(() => {
+    if (!showPaymentModal || pixStatus !== 'pending' || paymentMethod !== 'PIX') return;
+    
+    const timer = setInterval(() => {
+      setPixTimer(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [showPaymentModal, pixStatus, paymentMethod]);
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = (seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
 
   const subtotal = cart.reduce((acc, item) => {
     const price = item.product.promoPrice || item.product.price;
@@ -117,6 +149,10 @@ export const CustomerCart: React.FC<CustomerCartProps> = ({
       appliedCoupon?.code || null
     );
     setPlacedOrder(order);
+    setPixTimer(600); // Reset timer to 10 minutes
+    setPixStatus('pending'); // Reset PIX status to pending
+    setCopiedPix(false); // Reset copied state
+    setShowPaymentModal(true); // Open the Payment Modal overlay!
     setCartStep('success');
   };
 
@@ -432,11 +468,10 @@ export const CustomerCart: React.FC<CustomerCartProps> = ({
                   Opção de Pagamento
                 </h3>
 
-                <div className="grid grid-cols-3 gap-2 pb-2">
+                <div className="grid grid-cols-2 gap-2 pb-2">
                   {[
                     { id: "PIX", label: "PIX (5% Desc)", icon: "⚡" },
-                    { id: "CreditCard", label: "Cartão", icon: "💳" },
-                    { id: "Boleto", label: "Boleto", icon: "📄" }
+                    { id: "OnDelivery", label: "Na Entrega", icon: "💵" }
                   ].map(pay => (
                     <button
                       key={pay.id}
@@ -466,59 +501,11 @@ export const CustomerCart: React.FC<CustomerCartProps> = ({
                     </div>
                   )}
 
-                  {paymentMethod === 'CreditCard' && (
-                    <div className="space-y-2.5">
-                      <div className="grid grid-cols-1 gap-2">
-                        <input
-                          type="text"
-                          placeholder="Número do Cartão"
-                          value={cardNumber}
-                          onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-                          maxLength={19}
-                          className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 rounded-xl text-xs text-gray-900 dark:text-white outline-none"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Nome impresso no cartão"
-                          value={cardName}
-                          onChange={(e) => setCardName(e.target.value)}
-                          className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 rounded-xl text-xs text-gray-900 dark:text-white outline-none"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="text"
-                          placeholder="MM/AA"
-                          value={cardExpiry}
-                          onChange={(e) => setCardExpiry(e.target.value)}
-                          maxLength={5}
-                          className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 rounded-xl text-xs text-gray-900 dark:text-white outline-none"
-                        />
-                        <input
-                          type="password"
-                          placeholder="CVV"
-                          value={cardCvv}
-                          onChange={(e) => setCardCvv(e.target.value.replace(/\D/g,''))}
-                          maxLength={3}
-                          className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 rounded-xl text-xs text-gray-900 dark:text-white outline-none"
-                        />
-                      </div>
-                      <div>
-                        <select className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 rounded-xl text-xs text-gray-700 dark:text-gray-300 outline-none">
-                          <option>1x de R$ {finalTotal.toFixed(2)} sem juros</option>
-                          <option>2x de R$ {(finalTotal / 2).toFixed(2)} sem juros</option>
-                          <option>3x de R$ {(finalTotal / 3).toFixed(2)} sem juros</option>
-                          <option>6x de R$ {(finalTotal / 6).toFixed(2)} sem juros</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-
-                  {paymentMethod === 'Boleto' && (
+                  {paymentMethod === 'OnDelivery' && (
                     <div className="text-center py-2 space-y-1">
-                      <p className="text-xs font-bold text-gray-800 dark:text-gray-200">Boleto Bancário Capitão</p>
+                      <p className="text-xs font-bold text-gray-800 dark:text-gray-200">Pagamento na Entrega / Retirada</p>
                       <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-snug">
-                        Vencimento em 3 dias úteis. A confirmação de pagamento pode demorar de 1 a 2 dias úteis após a liquidação bancária.
+                        Realize o pagamento de forma segura no ato do recebimento ou retirada. Aceitamos dinheiro, PIX ou cartões de débito/crédito na maquininha do entregador ou atendente.
                       </p>
                     </div>
                   )}
@@ -697,6 +684,12 @@ export const CustomerCart: React.FC<CustomerCartProps> = ({
 
             <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
               <button 
+                onClick={() => setShowPaymentModal(true)}
+                className="bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2.5 px-5 rounded-xl text-xs cursor-pointer shadow-xs flex items-center justify-center gap-1.5 transition-all"
+              >
+                🔑 Abrir Modal de Pagamento
+              </button>
+              <button 
                 onClick={onNavigateToProfile}
                 className="bg-[#1565C0] hover:bg-[#1565C0]/90 text-white font-semibold py-2.5 px-5 rounded-xl text-xs cursor-pointer shadow-xs flex items-center justify-center gap-1.5 transition-all"
               >
@@ -710,6 +703,182 @@ export const CustomerCart: React.FC<CustomerCartProps> = ({
               </button>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* FLOATING PAYMENT MODAL OVERLAY */}
+      <AnimatePresence>
+        {showPaymentModal && placedOrder && (
+          <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
+            {/* Backdrop click to close */}
+            <div className="fixed inset-0 bg-slate-900/40" onClick={() => setShowPaymentModal(false)} />
+            
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 15 }}
+              className="bg-white dark:bg-gray-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-gray-150 dark:border-gray-800 p-6 relative text-center space-y-5 z-10"
+            >
+              {/* Close Icon */}
+              <button 
+                onClick={() => setShowPaymentModal(false)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
+                aria-label="Fechar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="space-y-1.5">
+                <div className="mx-auto w-12 h-12 bg-blue-50 dark:bg-blue-950/40 rounded-full flex items-center justify-center border border-blue-100 dark:border-blue-900/40">
+                  <ShieldCheck className="w-6 h-6 text-[#1565C0] dark:text-blue-400" />
+                </div>
+                <h3 className="text-base font-black text-gray-900 dark:text-white tracking-tight">
+                  Checkout Seguro Capitão
+                </h3>
+                <p className="text-[11px] text-gray-550 dark:text-gray-400">
+                  Pedido <span className="font-mono font-bold text-gray-950 dark:text-white">#{placedOrder.id}</span> • Total: <span className="font-bold text-[#1565C0] dark:text-blue-400">R$ {placedOrder.total.toFixed(2)}</span>
+                </p>
+              </div>
+
+              {placedOrder.paymentMethod === 'PIX' ? (
+                <div className="space-y-4">
+                  {/* Pix Info / Status Header */}
+                  <div className="p-3 bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/45 rounded-2xl flex flex-col items-center justify-center space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#1565C0] dark:text-blue-400 animate-pulse">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>AGUARDANDO PAGAMENTO PIX</span>
+                    </div>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                      Chave PIX expira em: <span className="font-mono font-bold text-red-500">{formatTime(pixTimer)}</span>
+                    </p>
+                  </div>
+
+                  {pixStatus === 'pending' ? (
+                    <>
+                      {/* Pix QR Code */}
+                      <div className="w-44 h-44 mx-auto bg-white p-2.5 rounded-2xl shadow-xs border border-gray-150 flex items-center justify-center relative">
+                        <svg className="w-full h-full" viewBox="0 0 100 100">
+                          <rect x="5" y="5" width="20" height="20" fill="#0f172a" />
+                          <rect x="9" y="9" width="12" height="12" fill="#ffffff" />
+                          <rect x="75" y="5" width="20" height="20" fill="#0f172a" />
+                          <rect x="79" y="9" width="12" height="12" fill="#ffffff" />
+                          <rect x="5" y="75" width="20" height="20" fill="#0f172a" />
+                          <rect x="9" y="79" width="12" height="12" fill="#ffffff" />
+                          
+                          <rect x="35" y="10" width="10" height="5" fill="#0f172a" />
+                          <rect x="55" y="5" width="10" height="15" fill="#0f172a" />
+                          <rect x="35" y="25" width="15" height="10" fill="#0f172a" />
+                          <rect x="60" y="30" width="10" height="10" fill="#0f172a" />
+                          <rect x="10" y="35" width="15" height="15" fill="#0f172a" />
+                          <rect x="30" y="50" width="25" height="5" fill="#0f172a" />
+                          <rect x="10" y="60" width="5" height="10" fill="#0f172a" />
+                          <rect x="35" y="65" width="15" height="20" fill="#0f172a" />
+                          <rect x="60" y="60" width="20" height="10" fill="#0f172a" />
+                          <rect x="75" y="45" width="15" height="15" fill="#0f172a" />
+                          <rect x="75" y="75" width="10" height="10" fill="#0f172a" />
+                        </svg>
+                        <span className="absolute bg-white px-1.5 py-0.5 rounded-lg border border-gray-200 text-sm shadow-xs leading-none select-none">🦫</span>
+                      </div>
+
+                      {/* Pix Key Copier */}
+                      <div className="space-y-2">
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                          Copie o código abaixo e cole no aplicativo do seu banco:
+                        </p>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            readOnly
+                            value="00020126580014br.gov.bcb.pix0136capi-8839-49fa-a387-capi-key520400005303986540510.005802BR5917CapitaoEmbalagens6009SaoPaulo62070503***6304CAPI"
+                            className="flex-1 bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-800 px-3 py-2.5 rounded-xl text-[9px] font-mono outline-none select-all text-gray-600 dark:text-gray-300"
+                          />
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText("00020126580014br.gov.bcb.pix0136capi-8839-49fa-a387-capi-key520400005303986540510.005802BR5917CapitaoEmbalagens6009SaoPaulo62070503***6304CAPI");
+                              setCopiedPix(true);
+                              setTimeout(() => setCopiedPix(false), 3000);
+                            }}
+                            className="bg-[#1565C0] hover:bg-[#1565C0]/90 text-white p-2.5 rounded-xl cursor-pointer flex items-center justify-center transition-all shrink-0"
+                            title="Copiar PIX"
+                          >
+                            {copiedPix ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Manual Confirmation simulation */}
+                      <button
+                        onClick={() => {
+                          setPixStatus('success');
+                        }}
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-2.5 rounded-xl text-xs cursor-pointer shadow-md transition-all active:scale-95"
+                      >
+                        Confirmar Pagamento Realizado
+                      </button>
+                    </>
+                  ) : (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="p-5 bg-emerald-50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-150 dark:border-emerald-900/40 text-center space-y-3"
+                    >
+                      <CheckCircle2 className="w-12 h-12 text-emerald-600 dark:text-emerald-400 mx-auto animate-bounce" />
+                      <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-400">
+                        PIX Confirmado! 🎉
+                      </h4>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-normal">
+                        Nosso sistema detectou a transferência. Seu pedido já foi enviado para a fila de separação da Capitão Embalagens!
+                      </p>
+                      <button
+                        onClick={() => setShowPaymentModal(false)}
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-xl text-xs cursor-pointer transition-all mt-2"
+                      >
+                        Acessar Painel do Pedido
+                      </button>
+                    </motion.div>
+                  )}
+                </div>
+              ) : (
+                /* Payment OnDelivery Modal Content */
+                <div className="space-y-4">
+                  <div className="p-4 bg-amber-50 dark:bg-amber-950/15 border border-amber-100 dark:border-amber-900/30 rounded-2xl text-left space-y-1.5">
+                    <h4 className="text-xs font-bold text-amber-800 dark:text-amber-400 flex items-center gap-1.5">
+                      💵 Pagamento na Entrega Selecionado
+                    </h4>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-normal">
+                      O seu pedido será processado imediatamente e o pagamento deverá ser realizado apenas no momento em que receber ou retirar os produtos.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-150 dark:border-gray-700 text-left text-xs space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Valor a ser Pago:</span>
+                      <span className="font-bold text-gray-900 dark:text-white">R$ {placedOrder.total.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Meio de Entrega:</span>
+                      <span className="font-bold text-gray-900 dark:text-white">{placedOrder.deliveryOption}</span>
+                    </div>
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-2 text-[10px] text-gray-400 leading-snug">
+                      💡 <strong>Dica:</strong> Nosso entregador leva maquininha de cartão portátil. Aceitamos dinheiro, PIX ou cartões de débito/crédito na maquininha!
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setShowPaymentModal(false)}
+                    className="w-full bg-[#1565C0] hover:bg-[#1565C0]/90 text-white font-extrabold py-3 rounded-xl text-xs cursor-pointer transition-all active:scale-95 shadow-sm"
+                  >
+                    Entendido, Acompanhar Pedido
+                  </button>
+                </div>
+              )}
+
+              <div className="text-[9px] text-gray-400 dark:text-gray-500 pt-2 flex justify-center items-center gap-1 border-t border-gray-100 dark:border-gray-800/80">
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                <span>Transação criptografada com alta segurança (SSL/TLS).</span>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

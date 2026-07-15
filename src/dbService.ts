@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { INITIAL_PRODUCTS } from "./types";
 import type { Product, Order } from "./types";
+import { encryptData, decryptData } from "./lib/cryptoUtils";
 
 // Initialize Supabase Client if credentials exist
 const supabaseUrl = process.env.SUPABASE_URL || "";
@@ -160,8 +161,9 @@ export function hashPassword(password: string): string {
 function readLocalProducts(): Product[] {
   try {
     if (fs.existsSync(PRODUCTS_FILE)) {
-      const data = fs.readFileSync(PRODUCTS_FILE, "utf-8");
-      return JSON.parse(data);
+      const data = fs.readFileSync(PRODUCTS_FILE, "utf-8").trim();
+      const decrypted = data.startsWith("ENC:") ? decryptData(data) : data;
+      return JSON.parse(decrypted);
     }
   } catch (error) {
     console.error("Local DB: Erro ao ler produtos do arquivo:", error);
@@ -171,7 +173,8 @@ function readLocalProducts(): Product[] {
 
 function writeLocalProducts(products: Product[]) {
   try {
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), "utf-8");
+    const raw = JSON.stringify(products, null, 2);
+    fs.writeFileSync(PRODUCTS_FILE, encryptData(raw), "utf-8");
   } catch (error) {
     console.error("Local DB: Erro ao salvar produtos no arquivo:", error);
   }
@@ -183,8 +186,9 @@ function writeLocalProducts(products: Product[]) {
 function readLocalOrders(): Order[] {
   try {
     if (fs.existsSync(ORDERS_FILE)) {
-      const data = fs.readFileSync(ORDERS_FILE, "utf-8");
-      return JSON.parse(data);
+      const data = fs.readFileSync(ORDERS_FILE, "utf-8").trim();
+      const decrypted = data.startsWith("ENC:") ? decryptData(data) : data;
+      return JSON.parse(decrypted);
     }
   } catch (error) {
     console.error("Local DB: Erro ao ler pedidos do arquivo:", error);
@@ -194,7 +198,8 @@ function readLocalOrders(): Order[] {
 
 function writeLocalOrders(orders: Order[]) {
   try {
-    fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2), "utf-8");
+    const raw = JSON.stringify(orders, null, 2);
+    fs.writeFileSync(ORDERS_FILE, encryptData(raw), "utf-8");
   } catch (error) {
     console.error("Local DB: Erro ao salvar pedidos no arquivo:", error);
   }
@@ -206,8 +211,9 @@ function writeLocalOrders(orders: Order[]) {
 function readLocalCustomers(): any[] {
   try {
     if (fs.existsSync(CUSTOMERS_FILE)) {
-      const data = fs.readFileSync(CUSTOMERS_FILE, "utf-8");
-      return JSON.parse(data);
+      const data = fs.readFileSync(CUSTOMERS_FILE, "utf-8").trim();
+      const decrypted = data.startsWith("ENC:") ? decryptData(data) : data;
+      return JSON.parse(decrypted);
     }
   } catch (error) {
     console.error("Local DB: Erro ao ler clientes do arquivo:", error);
@@ -239,7 +245,8 @@ function readLocalCustomers(): any[] {
 
 function writeLocalCustomers(customers: any[]) {
   try {
-    fs.writeFileSync(CUSTOMERS_FILE, JSON.stringify(customers, null, 2), "utf-8");
+    const raw = JSON.stringify(customers, null, 2);
+    fs.writeFileSync(CUSTOMERS_FILE, encryptData(raw), "utf-8");
   } catch (error) {
     console.error("Local DB: Erro ao salvar clientes no arquivo:", error);
   }
@@ -251,8 +258,9 @@ function writeLocalCustomers(customers: any[]) {
 function readLocalAdmins(): any[] {
   try {
     if (fs.existsSync(ADMINS_FILE)) {
-      const data = fs.readFileSync(ADMINS_FILE, "utf-8");
-      return JSON.parse(data);
+      const data = fs.readFileSync(ADMINS_FILE, "utf-8").trim();
+      const decrypted = data.startsWith("ENC:") ? decryptData(data) : data;
+      return JSON.parse(decrypted);
     }
   } catch (error) {
     console.error("Local DB: Erro ao ler admins do arquivo:", error);
@@ -269,7 +277,8 @@ function readLocalAdmins(): any[] {
 
 function writeLocalAdmins(admins: any[]) {
   try {
-    fs.writeFileSync(ADMINS_FILE, JSON.stringify(admins, null, 2), "utf-8");
+    const raw = JSON.stringify(admins, null, 2);
+    fs.writeFileSync(ADMINS_FILE, encryptData(raw), "utf-8");
   } catch (error) {
     console.error("Local DB: Erro ao salvar admins no arquivo:", error);
   }

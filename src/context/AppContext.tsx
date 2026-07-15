@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { encryptData, decryptData } from '../lib/cryptoUtils';
 import {
   Product,
   CartItem,
@@ -100,26 +101,50 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+// Helper function to safely parse localStorage items, preventing white page crash on corrupted keys
+function safeParseLocalStorage<T>(key: string, defaultValue: T): T {
+  try {
+    let value = localStorage.getItem(key);
+    if (!value) return defaultValue;
+    
+    // Decrypt if it was stored encrypted
+    if (value.startsWith("ENC:")) {
+      value = decryptData(value);
+    }
+    
+    if (!value) return defaultValue;
+
+    // Check if it's a raw non-JSON string, e.g. starting with '<' or 'The page'
+    const trimmed = value.trim();
+    if (trimmed.startsWith("<") || trimmed.startsWith("The page") || trimmed.startsWith("A página") || trimmed.includes("<!DOCTYPE")) {
+      console.warn(`[LocalStorage] Chave "${key}" contêm HTML/texto inválido, limpando.`);
+      localStorage.removeItem(key);
+      return defaultValue;
+    }
+    return JSON.parse(value) as T;
+  } catch (e) {
+    console.warn(`[LocalStorage] Erro ao ler a chave "${key}", redefinindo para os dados padrão:`, e);
+    localStorage.removeItem(key);
+    return defaultValue;
+  }
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Load initial states from localStorage if available, otherwise use initial data
   const [products, setProducts] = useState<Product[]>(() => {
-    const local = localStorage.getItem('capi_products');
-    return local ? JSON.parse(local) : INITIAL_PRODUCTS;
+    return safeParseLocalStorage('capi_products', INITIAL_PRODUCTS);
   });
   
   const [cart, setCart] = useState<CartItem[]>(() => {
-    const local = localStorage.getItem('capi_cart');
-    return local ? JSON.parse(local) : [];
+    return safeParseLocalStorage('capi_cart', []);
   });
   
   const [favorites, setFavorites] = useState<string[]>(() => {
-    const local = localStorage.getItem('capi_favorites');
-    return local ? JSON.parse(local) : [];
+    return safeParseLocalStorage('capi_favorites', []);
   });
   
   const [orders, setOrders] = useState<Order[]>(() => {
-    const local = localStorage.getItem('capi_orders');
-    return local ? JSON.parse(local) : [
+    const defaultOrders = [
       {
         id: "PED-1204",
         date: "2026-07-08 16:42",
@@ -153,38 +178,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ]
       }
     ];
+    return safeParseLocalStorage('capi_orders', defaultOrders);
   });
   
   const [coupons, setCoupons] = useState<Coupon[]>(() => {
-    const local = localStorage.getItem('capi_coupons');
-    return local ? JSON.parse(local) : INITIAL_COUPONS;
+    return safeParseLocalStorage('capi_coupons', INITIAL_COUPONS);
   });
   
   const [user, setUser] = useState<User>(() => {
-    const local = localStorage.getItem('capi_user');
-    return local ? JSON.parse(local) : INITIAL_USER;
+    return safeParseLocalStorage('capi_user', INITIAL_USER);
   });
   
   const [notifications, setNotifications] = useState<Notification[]>(() => {
-    const local = localStorage.getItem('capi_notifications');
-    return local ? JSON.parse(local) : INITIAL_NOTIFICATIONS;
+    return safeParseLocalStorage('capi_notifications', INITIAL_NOTIFICATIONS);
   });
   
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
-    const local = localStorage.getItem('capi_chat');
-    return local ? JSON.parse(local) : [
+    const defaultChat = [
       { id: "chat-1", sender: "support", text: "Olá! Seja bem-vindo ao Atendimento da Capitão Embalagens. Como posso te ajudar hoje?", timestamp: "2026-07-10 11:00" }
     ];
+    return safeParseLocalStorage('capi_chat', defaultChat);
   });
   
   const [schoolList, setSchoolList] = useState<SchoolListItem[]>(() => {
-    const local = localStorage.getItem('capi_school_list');
-    return local ? JSON.parse(local) : INITIAL_SCHOOL_LIST;
+    return safeParseLocalStorage('capi_school_list', INITIAL_SCHOOL_LIST);
   });
   
   const [giftList, setGiftList] = useState<GiftListItem[]>(() => {
-    const local = localStorage.getItem('capi_gift_list');
-    return local ? JSON.parse(local) : INITIAL_GIFT_LIST;
+    return safeParseLocalStorage('capi_gift_list', INITIAL_GIFT_LIST);
   });
   
   const [activeTheme, setActiveTheme] = useState<'light' | 'dark'>(() => {
@@ -195,29 +216,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isAdmin = false;
   
   const [isLogged, setIsLogged] = useState<boolean>(() => {
-    return localStorage.getItem('capi_is_logged') === 'true';
+    const raw = localStorage.getItem('capi_is_logged');
+    if (!raw) return false;
+    const decrypted = raw.startsWith("ENC:") ? decryptData(raw) : raw;
+    return decrypted === 'true';
   });
 
   // WhatsApp store configurations
   const [whatsappNumber, setWhatsappNumber] = useState<string>(() => {
-    return localStorage.getItem('capi_whatsapp_number') || "5511987654321";
+    const raw = localStorage.getItem('capi_whatsapp_number');
+    if (!raw) return "5511987654321";
+    return raw.startsWith("ENC:") ? decryptData(raw) : raw;
   });
   
   const [whatsappMessage, setWhatsappMessage] = useState<string>(() => {
-    return localStorage.getItem('capi_whatsapp_message') || "Olá! Gostaria de tirar uma dúvida sobre embalagens e produtos na Capitão Embalagens.";
+    const raw = localStorage.getItem('capi_whatsapp_message');
+    if (!raw) return "Olá! Gostaria de tirar uma dúvida sobre embalagens e produtos na Capitão Embalagens.";
+    return raw.startsWith("ENC:") ? decryptData(raw) : raw;
   });
 
-  // Sync with Local Storage
-  useEffect(() => { localStorage.setItem('capi_products', JSON.stringify(products)); }, [products]);
-  useEffect(() => { localStorage.setItem('capi_cart', JSON.stringify(cart)); }, [cart]);
-  useEffect(() => { localStorage.setItem('capi_favorites', JSON.stringify(favorites)); }, [favorites]);
-  useEffect(() => { localStorage.setItem('capi_orders', JSON.stringify(orders)); }, [orders]);
-  useEffect(() => { localStorage.setItem('capi_coupons', JSON.stringify(coupons)); }, [coupons]);
-  useEffect(() => { localStorage.setItem('capi_user', JSON.stringify(user)); }, [user]);
-  useEffect(() => { localStorage.setItem('capi_notifications', JSON.stringify(notifications)); }, [notifications]);
-  useEffect(() => { localStorage.setItem('capi_chat', JSON.stringify(chatMessages)); }, [chatMessages]);
-  useEffect(() => { localStorage.setItem('capi_school_list', JSON.stringify(schoolList)); }, [schoolList]);
-  useEffect(() => { localStorage.setItem('capi_gift_list', JSON.stringify(giftList)); }, [giftList]);
+  // Sync with Local Storage with automated AES/RC4 Encryption
+  useEffect(() => { localStorage.setItem('capi_products', encryptData(JSON.stringify(products))); }, [products]);
+  useEffect(() => { localStorage.setItem('capi_cart', encryptData(JSON.stringify(cart))); }, [cart]);
+  useEffect(() => { localStorage.setItem('capi_favorites', encryptData(JSON.stringify(favorites))); }, [favorites]);
+  useEffect(() => { localStorage.setItem('capi_orders', encryptData(JSON.stringify(orders))); }, [orders]);
+  useEffect(() => { localStorage.setItem('capi_coupons', encryptData(JSON.stringify(coupons))); }, [coupons]);
+  useEffect(() => { localStorage.setItem('capi_user', encryptData(JSON.stringify(user))); }, [user]);
+  useEffect(() => { localStorage.setItem('capi_notifications', encryptData(JSON.stringify(notifications))); }, [notifications]);
+  useEffect(() => { localStorage.setItem('capi_chat', encryptData(JSON.stringify(chatMessages))); }, [chatMessages]);
+  useEffect(() => { localStorage.setItem('capi_school_list', encryptData(JSON.stringify(schoolList))); }, [schoolList]);
+  useEffect(() => { localStorage.setItem('capi_gift_list', encryptData(JSON.stringify(giftList))); }, [giftList]);
   useEffect(() => { localStorage.setItem('capi_theme', activeTheme); }, [activeTheme]);
   useEffect(() => {
     if (activeTheme === 'dark') {
@@ -226,9 +254,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       document.documentElement.classList.remove('dark');
     }
   }, [activeTheme]);
-  useEffect(() => { localStorage.setItem('capi_whatsapp_number', whatsappNumber); }, [whatsappNumber]);
-  useEffect(() => { localStorage.setItem('capi_whatsapp_message', whatsappMessage); }, [whatsappMessage]);
-  useEffect(() => { localStorage.setItem('capi_is_logged', String(isLogged)); }, [isLogged]);
+  useEffect(() => { localStorage.setItem('capi_whatsapp_number', encryptData(whatsappNumber)); }, [whatsappNumber]);
+  useEffect(() => { localStorage.setItem('capi_whatsapp_message', encryptData(whatsappMessage)); }, [whatsappMessage]);
+  useEffect(() => { localStorage.setItem('capi_is_logged', encryptData(String(isLogged))); }, [isLogged]);
 
   // Fetch initial products and orders from server on load
   useEffect(() => {

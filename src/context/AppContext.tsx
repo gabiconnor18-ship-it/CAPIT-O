@@ -16,6 +16,18 @@ import {
   INITIAL_SCHOOL_LIST,
   INITIAL_GIFT_LIST
 } from '../types';
+import {
+  clientGetProducts,
+  clientGetOrders,
+  clientAddOrder,
+  clientUpdateOrderStatus,
+  clientRegisterCustomer,
+  clientLoginCustomer,
+  clientUpdateCustomerProfile,
+  clientAddProduct,
+  clientUpdateProduct,
+  clientDeleteProduct
+} from '../supabase';
 
 interface AppContextType {
   products: Product[];
@@ -220,25 +232,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Fetch initial products and orders from server on load
   useEffect(() => {
-    fetch('/api/products')
-      .then(res => {
-        if (!res.ok) throw new Error("Falha ao obter produtos");
-        return res.json();
-      })
+    clientGetProducts()
       .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (data && data.length > 0) {
           setProducts(data);
         }
       })
       .catch(err => console.log("Carregado via LocalStorage (Fallback):", err));
 
-    fetch('/api/orders')
-      .then(res => {
-        if (!res.ok) throw new Error("Falha ao obter pedidos");
-        return res.json();
-      })
+    clientGetOrders()
       .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (data && data.length > 0) {
           setOrders(data);
         }
       })
@@ -390,28 +394,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setOrders(prev => [newOrder, ...prev]);
 
     // Async sync with the backend
-    fetch('/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        items: [...cart],
-        total: Number(finalTotal.toFixed(2)),
-        paymentMethod,
-        deliveryOption,
-        address: {
-          street: selectedAddress.street,
-          number: selectedAddress.number,
-          city: selectedAddress.city,
-          state: selectedAddress.state,
-          zipCode: selectedAddress.zipCode,
-        },
-        appliedCoupon
-      })
-    })
-    .then(res => {
-      if (!res.ok) throw new Error("Erro ao salvar pedido no servidor");
-      return res.json();
-    })
+    clientAddOrder(newOrder)
     .then(backendOrder => {
       // Replace temporary local order with the server-verified order (which includes correct tracking/ID format)
       setOrders(prev => prev.map(o => o.id === newOrder.id ? backendOrder : o));
@@ -439,15 +422,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (status === 'Entregue') desc = "O pedido foi entregue no endereço solicitado. Obrigado por comprar na Capitão Embalagens!";
 
     // Sincronizar com backend
-    fetch(`/api/orders/${orderId}/status`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, description: desc })
-    })
-    .then(res => {
-      if (!res.ok) throw new Error("Falha ao atualizar no servidor");
-      return res.json();
-    })
+    const updatedHistory = [
+      ...(orders.find(o => o.id === orderId)?.statusHistory || []),
+      {
+        status,
+        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        description: desc
+      }
+    ];
+
+    clientUpdateOrderStatus(orderId, status, updatedHistory)
     .then(updatedOrder => {
       setOrders(prev => prev.map(ord => ord.id === orderId ? updatedOrder : ord));
       addNotification(
@@ -610,15 +594,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Admin Actions
   const addProduct = (newProd: Omit<Product, 'id' | 'reviews' | 'relatedProducts' | 'rating'>) => {
-    fetch('/api/products', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newProd)
-    })
-    .then(res => {
-      if (!res.ok) throw new Error("Erro ao criar produto no servidor");
-      return res.json();
-    })
+    clientAddProduct(newProd)
     .then(backendProduct => {
       setProducts(prev => [backendProduct, ...prev]);
       addNotification("Novo Produto Cadastrado! 📝", `O produto "${backendProduct.name}" foi inserido no estoque do servidor.`);
@@ -639,15 +615,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateProduct = (updated: Product) => {
-    fetch(`/api/products/${updated.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updated)
-    })
-    .then(res => {
-      if (!res.ok) throw new Error("Erro ao atualizar produto no servidor");
-      return res.json();
-    })
+    clientUpdateProduct(updated)
     .then(backendProduct => {
       setProducts(prev => prev.map(p => p.id === updated.id ? backendProduct : p));
       addNotification("Produto Sincronizado! ⚙️", `O produto "${updated.name}" foi salvo com sucesso no servidor.`);
@@ -663,11 +631,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteProduct = (productId: string) => {
     const p = products.find(prod => prod.id === productId);
 
-    fetch(`/api/products/${productId}`, {
-      method: 'DELETE'
-    })
-    .then(res => {
-      if (!res.ok) throw new Error("Erro ao remover produto no servidor");
+    clientDeleteProduct(productId)
+    .then(() => {
       setProducts(prev => prev.filter(p => p.id !== productId));
       if (p) {
         addNotification("Produto Removido! 🗑️", `O produto "${p.name}" foi removido do estoque do servidor.`);
@@ -752,15 +717,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUser(updatedUser);
 
     if (user.id) {
-      fetch(`/api/auth/profile/${user.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, phone, addresses: updatedAddresses })
-      })
-      .then(res => {
-        if (!res.ok) throw new Error("Erro ao salvar perfil no servidor");
-        return res.json();
-      })
+      clientUpdateCustomerProfile(user.id, name, email, phone, updatedAddresses)
       .then(savedUser => {
         setUser(savedUser);
         addNotification("Perfil Sincronizado! 👤", "Seus dados cadastrais foram salvos e sincronizados com o servidor oficial da Capitão Embalagens.");
@@ -776,16 +733,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const loginCustomer = async (email: string, password: string): Promise<boolean> => {
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Erro no login');
-      }
-      const userData = await res.json();
+      const userData = await clientLoginCustomer(email, password);
       setUser(userData);
       setIsLogged(true);
       addNotification("Login efetuado com sucesso! 🎉", `Bem-vindo de volta, ${userData.name}!`);
@@ -799,16 +747,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const registerCustomer = async (name: string, email: string, password: string, phone: string): Promise<boolean> => {
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, phone })
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Erro no registro');
-      }
-      const userData = await res.json();
+      const userData = await clientRegisterCustomer(name, email, password, phone);
       setUser(userData);
       setIsLogged(true);
       addNotification("Cadastro realizado! 🎉", `Bem-vindo à Capitão Embalagens, ${userData.name}!`);

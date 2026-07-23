@@ -382,7 +382,7 @@ function AppContent() {
                     <span className="relative bg-white dark:bg-gray-900 px-3 text-[9px] text-gray-400 dark:text-gray-500 font-extrabold uppercase tracking-wide">Ou acessar com</span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <button 
                       onClick={() => handleQuickLogin('google')}
                       className="flex items-center justify-center gap-1 py-2 px-1 border border-gray-200 dark:border-gray-850 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl text-[10px] font-bold cursor-pointer dark:text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
@@ -396,13 +396,6 @@ function AppContent() {
                     >
                       <span className="text-xs">🍎</span>
                       <span className="ml-1 text-[9px]">Apple</span>
-                    </button>
-                    <button 
-                      onClick={() => handleQuickLogin('facebook')}
-                      className="flex items-center justify-center gap-1 py-2 px-1 border border-gray-200 dark:border-gray-850 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl text-[10px] font-bold cursor-pointer dark:text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
-                    >
-                      <span className="text-xs">🔵</span>
-                      <span className="ml-1 text-[9px]">Facebook</span>
                     </button>
                   </div>
                 </>

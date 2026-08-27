@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for Node.js Fullstack (Vite + Express)
+# Production Dockerfile for Capitão Embalagens (Vite SPA + Express Backend)
 
 # Stage 1: Build stage
 FROM node:20-alpine AS builder

@@ -29,12 +29,8 @@ ENV PORT=3000
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-# Copy built dist files
+# Copy built dist files (contains backend dist/server.cjs and frontend dist SPA)
 COPY --from=builder /app/dist ./dist
-
-# Copy assets and metadata
-COPY --from=builder /app/assets ./assets
-COPY --from=builder /app/metadata.json ./metadata.json
 
 EXPOSE 3000
 

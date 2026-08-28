@@ -178,7 +178,7 @@ function readLocalProducts(): Product[] {
 function writeLocalProducts(products: Product[]) {
   try {
     const raw = JSON.stringify(products, null, 2);
-    fs.writeFileSync(PRODUCTS_FILE, encryptData(raw), "utf-8");
+    fs.writeFileSync(PRODUCTS_FILE, raw, "utf-8");
   } catch (error) {
     console.error("Local DB: Erro ao salvar produtos no arquivo:", error);
   }
@@ -203,7 +203,7 @@ function readLocalOrders(): Order[] {
 function writeLocalOrders(orders: Order[]) {
   try {
     const raw = JSON.stringify(orders, null, 2);
-    fs.writeFileSync(ORDERS_FILE, encryptData(raw), "utf-8");
+    fs.writeFileSync(ORDERS_FILE, raw, "utf-8");
   } catch (error) {
     console.error("Local DB: Erro ao salvar pedidos no arquivo:", error);
   }
@@ -250,7 +250,7 @@ function readLocalCustomers(): any[] {
 function writeLocalCustomers(customers: any[]) {
   try {
     const raw = JSON.stringify(customers, null, 2);
-    fs.writeFileSync(CUSTOMERS_FILE, encryptData(raw), "utf-8");
+    fs.writeFileSync(CUSTOMERS_FILE, raw, "utf-8");
   } catch (error) {
     console.error("Local DB: Erro ao salvar clientes no arquivo:", error);
   }
@@ -282,7 +282,7 @@ function readLocalAdmins(): any[] {
 function writeLocalAdmins(admins: any[]) {
   try {
     const raw = JSON.stringify(admins, null, 2);
-    fs.writeFileSync(ADMINS_FILE, encryptData(raw), "utf-8");
+    fs.writeFileSync(ADMINS_FILE, raw, "utf-8");
   } catch (error) {
     console.error("Local DB: Erro ao salvar admins no arquivo:", error);
   }
